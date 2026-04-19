@@ -1,0 +1,36 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# IDE
+.idea/
+.vscode/
+
+# Local app artifacts
+frontend/.env.local
+backend/.env
