@@ -22,8 +22,12 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
-import { searchPeople } from "@/lib/api";
-import { ROHAN_MAYYA_DEMO_LEAD } from "@/lib/demo-leads";
+import {
+  deleteSavedLead,
+  fetchSavedLeads,
+  persistSavedLead,
+  searchPeople,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, PeopleSearchResponse, PersonCard } from "@/lib/types";
 
@@ -39,9 +43,7 @@ export function SearchShell() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [searchData, setSearchData] = useState<PeopleSearchResponse | null>(null);
-  const [savedLeads, setSavedLeads] = useState<PersonCard[]>([
-    ROHAN_MAYYA_DEMO_LEAD,
-  ]);
+  const [savedLeads, setSavedLeads] = useState<PersonCard[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,9 @@ export function SearchShell() {
     [savedLeads, selectedLeadId],
   );
 
-  function addToLeads(person: PersonCard) {
+  async function addToLeads(person: PersonCard) {
+    if (person.crustdata_person_id === null) return;
+    // Optimistic update
     setSavedLeads((current) => {
       const exists = current.some(
         (lead) => lead.crustdata_person_id === person.crustdata_person_id,
@@ -68,13 +72,37 @@ export function SearchShell() {
       if (exists) return current;
       return [person, ...current];
     });
+    try {
+      await persistSavedLead(person);
+    } catch (err) {
+      // Roll back on failure
+      setSavedLeads((current) =>
+        current.filter(
+          (lead) => lead.crustdata_person_id !== person.crustdata_person_id,
+        ),
+      );
+      setError(
+        err instanceof Error ? err.message : "Failed to save lead.",
+      );
+    }
   }
 
-  function removeLead(personId: number | null) {
+  async function removeLead(personId: number | null) {
+    if (personId === null) return;
+    const previous = savedLeads;
     setSavedLeads((current) =>
       current.filter((lead) => lead.crustdata_person_id !== personId),
     );
     setSelectedLeadId(null);
+    try {
+      await deleteSavedLead(personId);
+    } catch (err) {
+      // Roll back on failure
+      setSavedLeads(previous);
+      setError(
+        err instanceof Error ? err.message : "Failed to delete lead.",
+      );
+    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -138,6 +166,26 @@ export function SearchShell() {
       behavior: "smooth",
     });
   }, [messages, searchData, isLoading]);
+
+  // Hydrate saved leads from the backend SQLite store on mount.
+  useEffect(() => {
+    let cancelled = false;
+    fetchSavedLeads()
+      .then((leads) => {
+        if (!cancelled) setSavedLeads(leads);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          // Non-fatal — surface in the chat error band so user can see why
+          // saved leads might be empty (e.g. backend not running).
+          // eslint-disable-next-line no-console
+          console.error("Failed to load saved leads", err);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <SidebarProvider defaultOpen>

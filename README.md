@@ -41,7 +41,7 @@ Maps directly to **AI-Native Agencies** and **AI-Native SDR** in YC's Spring 202
 
 - Hritik Datta
 - Saket Toshniwal
-- *(third teammate)*
+- Maitreya Mishra
 
 ---
 

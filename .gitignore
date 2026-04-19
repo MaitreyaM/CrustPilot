@@ -34,3 +34,5 @@ coverage/
 # Local app artifacts
 frontend/.env.local
 backend/.env
+backend/crustpilot.db
+backend/crustpilot.db-*
