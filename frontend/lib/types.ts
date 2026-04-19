@@ -41,6 +41,11 @@ export type PersonCard = {
   contact: Record<string, unknown>;
   social_profiles: Record<string, unknown>;
   raw_profile: Record<string, unknown>;
+  /**
+   * Optional direct phone number (only present for manually added/demo leads;
+   * Crustdata search responses only return availability flags via `contact.has_phone_number`).
+   */
+  phone_number?: string | null;
 };
 
 export type PeopleSearchResponse = {

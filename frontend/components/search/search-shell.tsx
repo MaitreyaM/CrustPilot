@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpIcon, BookmarkPlus, Paperclip, Search, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUpIcon,
+  BookmarkPlus,
+  ExternalLink,
+  Globe,
+  Paperclip,
+  Phone,
+  Search,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
@@ -12,6 +23,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { searchPeople } from "@/lib/api";
+import { ROHAN_MAYYA_DEMO_LEAD } from "@/lib/demo-leads";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, PeopleSearchResponse, PersonCard } from "@/lib/types";
 
@@ -27,7 +39,9 @@ export function SearchShell() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [searchData, setSearchData] = useState<PeopleSearchResponse | null>(null);
-  const [savedLeads, setSavedLeads] = useState<PersonCard[]>([]);
+  const [savedLeads, setSavedLeads] = useState<PersonCard[]>([
+    ROHAN_MAYYA_DEMO_LEAD,
+  ]);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +52,11 @@ export function SearchShell() {
 
   const selectedLead = useMemo(
     () =>
-      savedLeads.find((lead) => lead.crustdata_person_id === selectedLeadId) ??
-      savedLeads[0] ??
-      null,
+      selectedLeadId === null
+        ? null
+        : savedLeads.find(
+            (lead) => lead.crustdata_person_id === selectedLeadId,
+          ) ?? null,
     [savedLeads, selectedLeadId],
   );
 
@@ -52,7 +68,13 @@ export function SearchShell() {
       if (exists) return current;
       return [person, ...current];
     });
-    setSelectedLeadId(person.crustdata_person_id);
+  }
+
+  function removeLead(personId: number | null) {
+    setSavedLeads((current) =>
+      current.filter((lead) => lead.crustdata_person_id !== personId),
+    );
+    setSelectedLeadId(null);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -121,7 +143,12 @@ export function SearchShell() {
     <SidebarProvider defaultOpen>
       <AppSidebar
         activeView={activeView}
-        onChangeView={setActiveView}
+        onChangeView={(view) => {
+          setActiveView(view);
+          if (view === "saved-leads") {
+            setSelectedLeadId(null);
+          }
+        }}
         savedLeadsCount={savedLeads.length}
       />
       <SidebarInset>
@@ -145,6 +172,7 @@ export function SearchShell() {
           <SavedLeadsView
             leads={savedLeads}
             onBackToSearch={() => setActiveView("people-search")}
+            onRemoveLead={removeLead}
             onSelectLead={setSelectedLeadId}
             selectedLead={selectedLead}
           />
@@ -390,6 +418,10 @@ function ResultsList({
           const isSaved = savedLeads.some(
             (lead) => lead.crustdata_person_id === person.crustdata_person_id,
           );
+          const phone = person.phone_number ?? null;
+          const phoneAvailable = Boolean(
+            phone || (person.contact as { has_phone_number?: boolean })?.has_phone_number,
+          );
           return (
             <article
               className="rounded-xl border border-neutral-800/80 bg-neutral-900/60 p-4"
@@ -406,16 +438,18 @@ function ResultsList({
                     </p>
                   ) : null}
                 </div>
-                <Button
-                  className="shrink-0"
-                  onClick={() => onAddToLeads(person)}
-                  size="sm"
-                  type="button"
-                  variant={isSaved ? "secondary" : "outline"}
-                >
-                  <BookmarkPlus className="size-3.5" />
-                  {isSaved ? "Saved" : "Save"}
-                </Button>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <CallButton compact phone={phone} phoneAvailable={phoneAvailable} />
+                  <Button
+                    onClick={() => onAddToLeads(person)}
+                    size="sm"
+                    type="button"
+                    variant={isSaved ? "secondary" : "outline"}
+                  >
+                    <BookmarkPlus className="size-3.5" />
+                    {isSaved ? "Saved" : "Save"}
+                  </Button>
+                </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
                 {(person.current_title || person.current_company) && (
@@ -442,166 +476,325 @@ function SavedLeadsView({
   leads,
   selectedLead,
   onSelectLead,
+  onRemoveLead,
   onBackToSearch,
 }: {
   leads: PersonCard[];
   selectedLead: PersonCard | null;
   onSelectLead: (leadId: number | null) => void;
+  onRemoveLead: (leadId: number | null) => void;
   onBackToSearch: () => void;
 }) {
-  return (
-    <div className="relative flex h-screen min-w-0 flex-1 flex-col lg:flex-row">
-      <div className="w-full border-b border-neutral-800/80 lg:w-[340px] lg:border-b-0 lg:border-r">
-        <div className="flex items-center justify-between gap-3 border-b border-neutral-800/80 px-4 py-3">
+  // Detail mode: selected lead is shown, with back arrow to grid
+  if (selectedLead) {
+    return (
+      <div className="relative flex h-screen min-w-0 flex-1 flex-col">
+        <header className="relative z-20 flex items-center gap-3 border-b border-white/5 px-4 py-3">
           <SidebarTrigger />
-          <div className="mr-auto">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
-              Saved Leads
-            </div>
-            <div className="text-sm font-semibold text-neutral-100">
-              {leads.length} profile{leads.length === 1 ? "" : "s"}
-            </div>
-          </div>
-          <Button onClick={onBackToSearch} size="sm" variant="outline">
-            Back
-          </Button>
-        </div>
+          <button
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-neutral-400 transition hover:bg-white/5 hover:text-neutral-100"
+            onClick={() => onSelectLead(null)}
+            type="button"
+          >
+            <ArrowLeft className="size-4" />
+            All leads
+          </button>
+          <span className="ml-auto text-xs text-neutral-500">
+            {selectedLead.name}
+          </span>
+        </header>
 
-        <div className="space-y-1.5 p-3">
-          {leads.length === 0 ? (
-            <div className="rounded-lg border border-neutral-800/80 bg-neutral-900/40 p-4 text-xs text-neutral-500">
-              No saved leads yet. Save people from search results.
-            </div>
-          ) : (
-            leads.map((lead) => (
-              <button
-                className={cn(
-                  "w-full rounded-lg border border-neutral-800/80 bg-neutral-900/40 p-3 text-left transition hover:border-neutral-700 hover:bg-neutral-900/70",
-                  selectedLead?.crustdata_person_id === lead.crustdata_person_id &&
-                    "border-neutral-600 bg-neutral-900/90",
-                )}
-                key={lead.crustdata_person_id ?? lead.name}
-                onClick={() => onSelectLead(lead.crustdata_person_id)}
-                type="button"
-              >
-                <div className="text-sm font-semibold text-neutral-100">
-                  {lead.name}
-                </div>
-                <div className="mt-1 truncate text-xs text-neutral-500">
-                  {[lead.current_title, lead.current_company]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </div>
-              </button>
-            ))
-          )}
+        <div className="flex-1 overflow-auto px-6 py-8">
+          <LeadDetail
+            lead={selectedLead}
+            onRemove={() => onRemoveLead(selectedLead.crustdata_person_id)}
+          />
         </div>
       </div>
+    );
+  }
 
-      <div className="min-w-0 flex-1 overflow-auto p-6">
-        {selectedLead ? (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-neutral-800/80 bg-neutral-900/40 p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-2xl font-semibold text-neutral-100">
-                    {selectedLead.name}
-                  </div>
-                  {selectedLead.headline ? (
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
-                      {selectedLead.headline}
-                    </p>
-                  ) : null}
-                </div>
-                {selectedLead.profile_url ? (
-                  <Button
-                    onClick={() =>
-                      window.open(selectedLead.profile_url ?? "", "_blank")
-                    }
-                    size="sm"
-                    variant="outline"
-                  >
-                    View profile
-                  </Button>
-                ) : null}
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <LeadField label="Current title" value={selectedLead.current_title} />
-                <LeadField
-                  label="Current company"
-                  value={selectedLead.current_company}
-                />
-                <LeadField label="Location" value={selectedLead.location} />
-                <LeadField
-                  label="Connections"
-                  value={
-                    selectedLead.connections
-                      ? `${selectedLead.connections} connections`
-                      : null
-                  }
-                />
-              </div>
+  // Grid mode: all saved leads
+  return (
+    <div className="relative flex h-screen min-w-0 flex-1 flex-col">
+      <header className="relative z-20 flex items-center gap-3 border-b border-white/5 px-4 py-3">
+        <SidebarTrigger />
+        <div className="flex items-center gap-2 text-sm text-neutral-400">
+          <BookmarkPlus className="size-4" />
+          <span className="font-medium text-neutral-200">Saved Leads</span>
+        </div>
+        <span className="ml-auto text-xs text-neutral-500">
+          {leads.length} profile{leads.length === 1 ? "" : "s"}
+        </span>
+      </header>
+
+      <div className="flex-1 overflow-auto px-6 py-8">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-6 flex items-end justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-white">
+                Your saved leads
+              </h1>
+              <p className="mt-1 text-sm text-neutral-400">
+                Click a card to inspect the full profile, or call directly.
+              </p>
             </div>
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              <LeadSection
-                items={selectedLead.skills}
-                renderItem={(s) => s}
-                title="Skills"
-              />
-              <LeadSection
-                items={selectedLead.languages}
-                renderItem={(l) => l}
-                title="Languages"
-              />
-              <LeadObjectSection
-                data={selectedLead.contact}
-                title="Contact flags"
-              />
-              <LeadObjectSection
-                data={selectedLead.social_profiles}
-                title="Social profiles"
-              />
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              <LeadRecordSection
-                records={selectedLead.current_experience}
-                title="Current background"
-              />
-              <LeadRecordSection
-                records={selectedLead.past_experience}
-                title="Past background"
-              />
-            </div>
-
-            <LeadRecordSection
-              records={selectedLead.education}
-              title="Education"
-            />
-
-            {selectedLead.summary ? (
-              <div className="rounded-xl border border-neutral-800/80 bg-neutral-900/40 p-5">
-                <div className="text-sm font-semibold text-neutral-100">Summary</div>
-                <p className="mt-2 text-sm leading-6 text-neutral-400">
-                  {selectedLead.summary}
-                </p>
-              </div>
-            ) : null}
+            <Button onClick={onBackToSearch} size="sm" variant="outline">
+              Back to search
+            </Button>
           </div>
-        ) : (
-          <div className="rounded-xl border border-neutral-800/80 bg-neutral-900/40 p-6 text-sm text-neutral-500">
-            Select a saved lead to inspect their returned details.
-          </div>
-        )}
+
+          {leads.length === 0 ? (
+            <div className="rounded-xl border border-white/5 bg-white/[0.02] p-10 text-center text-sm text-neutral-500">
+              No saved leads yet. Save people from search results to build your
+              outreach list.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {leads.map((lead) => (
+                <LeadGridCard
+                  key={lead.crustdata_person_id ?? lead.name}
+                  lead={lead}
+                  onOpen={() => onSelectLead(lead.crustdata_person_id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function LeadField({ label, value }: { label: string; value: string | null | undefined }) {
+function LeadGridCard({
+  lead,
+  onOpen,
+}: {
+  lead: PersonCard;
+  onOpen: () => void;
+}) {
+  const phone = lead.phone_number ?? null;
+  const phoneAvailable = Boolean(
+    phone || (lead.contact as { has_phone_number?: boolean })?.has_phone_number,
+  );
   return (
-    <div className="rounded-lg border border-neutral-800/80 bg-neutral-900/40 p-3">
+    <article
+      aria-label={`Open ${lead.name}`}
+      className="group flex h-full cursor-pointer flex-col rounded-xl border border-white/8 bg-white/[0.02] p-5 transition hover:border-white/15 hover:bg-white/[0.04]"
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold text-neutral-100">
+              {lead.name}
+            </h3>
+            <p className="mt-1 truncate text-xs text-neutral-500">
+              {[lead.current_title, lead.current_company]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {lead.profile_url ? (
+              <a
+                aria-label="Open LinkedIn profile"
+                className="inline-flex size-7 items-center justify-center rounded-md text-neutral-500 transition hover:bg-white/8 hover:text-neutral-100"
+                href={lead.profile_url}
+                onClick={(e) => e.stopPropagation()}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <ExternalLink className="size-3.5" />
+              </a>
+            ) : null}
+          </div>
+        </div>
+
+        {lead.headline ? (
+          <p className="mt-3 line-clamp-2 text-xs leading-5 text-neutral-400">
+            {lead.headline}
+          </p>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+          {lead.location ? <span>{lead.location}</span> : null}
+          {lead.connections ? (
+            <span>{lead.connections.toLocaleString()} connections</span>
+          ) : null}
+        </div>
+
+        {lead.skills.length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-1">
+            {lead.skills.slice(0, 4).map((skill) => (
+              <span
+                className="rounded bg-white/8 px-1.5 py-0.5 text-[10px] text-neutral-300"
+                key={skill}
+              >
+                {skill}
+              </span>
+            ))}
+            {lead.skills.length > 4 ? (
+              <span className="rounded bg-white/4 px-1.5 py-0.5 text-[10px] text-neutral-500">
+                +{lead.skills.length - 4}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-4">
+        <CallButton
+          onClickStop
+          phone={phone}
+          phoneAvailable={phoneAvailable}
+          size="sm"
+        />
+        <span className="text-[10px] uppercase tracking-[0.16em] text-neutral-600">
+          Open profile →
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function LeadDetail({
+  lead,
+  onRemove,
+}: {
+  lead: PersonCard;
+  onRemove: () => void;
+}) {
+  const phone = lead.phone_number ?? null;
+  const phoneAvailable = Boolean(
+    phone || (lead.contact as { has_phone_number?: boolean })?.has_phone_number,
+  );
+  const socialEntries = Object.entries(lead.social_profiles ?? {}).filter(
+    ([, value]) => typeof value === "string" && value,
+  ) as Array<[string, string]>;
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-5">
+      {/* Hero card */}
+      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-3xl font-semibold tracking-tight text-white">
+              {lead.name}
+            </div>
+            {lead.headline ? (
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+                {lead.headline}
+              </p>
+            ) : null}
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+              {lead.location ? <span>{lead.location}</span> : null}
+              {lead.connections ? (
+                <span>{lead.connections.toLocaleString()} connections</span>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <CallButton phone={phone} phoneAvailable={phoneAvailable} size="default" />
+            {lead.profile_url ? (
+              <Button
+                onClick={() => window.open(lead.profile_url ?? "", "_blank")}
+                size="default"
+                type="button"
+                variant="outline"
+              >
+                <ExternalLink className="size-4" />
+                LinkedIn
+              </Button>
+            ) : null}
+            <button
+              aria-label="Remove lead"
+              className="inline-flex size-10 items-center justify-center rounded-xl border border-white/8 bg-white/[0.02] text-neutral-400 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+              onClick={onRemove}
+              type="button"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <DetailField label="Current title" value={lead.current_title} />
+          <DetailField label="Current company" value={lead.current_company} />
+          <DetailField label="Location" value={lead.location} />
+          <DetailField
+            label="Phone"
+            value={phone ?? (phoneAvailable ? "Available via Crustdata" : null)}
+          />
+        </div>
+      </div>
+
+      {/* Summary */}
+      {lead.summary ? (
+        <DetailCard title="Summary">
+          <p className="text-sm leading-6 text-neutral-300">{lead.summary}</p>
+        </DetailCard>
+      ) : null}
+
+      {/* Skills + Languages + Social */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <DetailCard title="Skills">
+          <ChipList items={lead.skills} />
+        </DetailCard>
+        <DetailCard title="Languages">
+          <ChipList items={lead.languages} />
+        </DetailCard>
+        <DetailCard title="Social profiles">
+          {socialEntries.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              {socialEntries.map(([key, url]) => (
+                <a
+                  className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-neutral-400 transition hover:bg-white/5 hover:text-neutral-100"
+                  href={url}
+                  key={key}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <Globe className="size-3.5 shrink-0 text-neutral-500 group-hover:text-neutral-300" />
+                  <span className="truncate">{url.replace(/^https?:\/\//, "")}</span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <EmptyHint>No social profiles linked.</EmptyHint>
+          )}
+        </DetailCard>
+      </div>
+
+      {/* Experience */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <DetailCard title="Current role">
+          <RecordList records={lead.current_experience} />
+        </DetailCard>
+        <DetailCard title="Past roles">
+          <RecordList records={lead.past_experience} />
+        </DetailCard>
+      </div>
+
+      {/* Education */}
+      <DetailCard title="Education">
+        <RecordList records={lead.education} />
+      </DetailCard>
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
       <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
         {label}
       </div>
@@ -610,103 +803,130 @@ function LeadField({ label, value }: { label: string; value: string | null | und
   );
 }
 
-function LeadSection<T>({
+function DetailCard({
   title,
-  items,
-  renderItem,
+  children,
 }: {
   title: string;
-  items: T[];
-  renderItem: (item: T) => string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-800/80 bg-neutral-900/40 p-5">
-      <div className="text-sm font-semibold text-neutral-100">{title}</div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {items.length > 0 ? (
-          items.map((item, index) => (
-            <span
-              className="rounded-md bg-neutral-800/60 px-2.5 py-1 text-xs text-neutral-300"
-              key={`${title}-${index}`}
-            >
-              {renderItem(item)}
-            </span>
-          ))
-        ) : (
-          <div className="text-xs text-neutral-500">No data.</div>
-        )}
+    <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+      <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-500">
+        {title}
       </div>
+      {children}
     </div>
   );
 }
 
-function LeadObjectSection({
-  title,
-  data,
-}: {
-  title: string;
-  data: Record<string, unknown>;
-}) {
-  const entries = Object.entries(data).filter(
-    ([, value]) => value !== null && value !== "",
-  );
+function ChipList({ items }: { items: string[] }) {
+  if (items.length === 0) return <EmptyHint>No data.</EmptyHint>;
   return (
-    <div className="rounded-xl border border-neutral-800/80 bg-neutral-900/40 p-5">
-      <div className="text-sm font-semibold text-neutral-100">{title}</div>
-      <div className="mt-3 space-y-2">
-        {entries.length > 0 ? (
-          entries.map(([key, value]) => (
-            <div
-              className="rounded-md border border-neutral-800/80 bg-neutral-900/40 p-2.5 text-xs text-neutral-400"
-              key={key}
-            >
-              <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
-                {key}
-              </div>
-              <div className="mt-1 break-words text-neutral-300">{String(value)}</div>
-            </div>
-          ))
-        ) : (
-          <div className="text-xs text-neutral-500">No data.</div>
-        )}
-      </div>
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item, index) => (
+        <span
+          className="rounded-md bg-white/8 px-2.5 py-1 text-xs text-neutral-200"
+          key={`${item}-${index}`}
+        >
+          {item}
+        </span>
+      ))}
     </div>
   );
 }
 
-function LeadRecordSection({
-  title,
+function RecordList({
   records,
 }: {
-  title: string;
   records: Array<Record<string, unknown>>;
 }) {
+  if (records.length === 0) return <EmptyHint>No data.</EmptyHint>;
   return (
-    <div className="rounded-xl border border-neutral-800/80 bg-neutral-900/40 p-5">
-      <div className="text-sm font-semibold text-neutral-100">{title}</div>
-      <div className="mt-3 space-y-2.5">
-        {records.length > 0 ? (
-          records.map((record, index) => (
-            <div
-              className="rounded-md border border-neutral-800/80 bg-neutral-900/40 p-3 text-xs text-neutral-300"
-              key={`${title}-${index}`}
-            >
-              {Object.entries(record).map(([key, value]) => (
-                <div className="mt-1.5 first:mt-0" key={key}>
-                  <span className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
-                    {key}
-                  </span>
-                  <div className="mt-0.5 break-words text-neutral-300">
-                    {String(value)}
-                  </div>
-                </div>
-              ))}
+    <div className="space-y-3">
+      {records.map((record, index) => {
+        const title = (record.title as string) || (record.degree as string) || "Role";
+        const company =
+          (record.company_name as string) || (record.school as string) || "";
+        const range = [record.start_date, record.end_date]
+          .filter(Boolean)
+          .join(" – ");
+        const description = (record.description as string) || "";
+        return (
+          <div
+            className="rounded-lg border border-white/5 bg-white/[0.02] p-3"
+            key={`record-${index}`}
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-sm font-medium text-neutral-100">{title}</div>
+              {range ? (
+                <div className="text-[11px] text-neutral-500">{range}</div>
+              ) : null}
             </div>
-          ))
-        ) : (
-          <div className="text-xs text-neutral-500">No data.</div>
-        )}
-      </div>
+            {company ? (
+              <div className="mt-0.5 text-xs text-neutral-400">{company}</div>
+            ) : null}
+            {description ? (
+              <p className="mt-2 text-xs leading-5 text-neutral-400">
+                {description}
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
+  );
+}
+
+function EmptyHint({ children }: { children: React.ReactNode }) {
+  return <div className="text-xs text-neutral-500">{children}</div>;
+}
+
+function CallButton({
+  phone,
+  phoneAvailable,
+  size = "sm",
+  compact = false,
+  onClickStop = false,
+}: {
+  phone: string | null;
+  phoneAvailable: boolean;
+  size?: "sm" | "default";
+  compact?: boolean;
+  onClickStop?: boolean;
+}) {
+  const disabled = !phone;
+  const label = compact
+    ? phone ?? (phoneAvailable ? "Phone" : "No phone")
+    : phone ?? (phoneAvailable ? "Phone available" : "No phone on file");
+
+  const handleClick: React.MouseEventHandler<HTMLAnchorElement> = (e) => {
+    if (onClickStop) e.stopPropagation();
+    if (disabled) e.preventDefault();
+  };
+
+  return (
+    <a
+      aria-disabled={disabled}
+      className={cn(
+        "relative z-10 inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] text-xs font-medium transition",
+        size === "default" ? "h-10 px-3.5 text-sm" : "h-7 px-2.5",
+        disabled
+          ? "cursor-not-allowed text-neutral-600"
+          : "text-neutral-100 hover:border-emerald-400/40 hover:bg-emerald-400/10 hover:text-emerald-200",
+      )}
+      href={disabled ? undefined : `tel:${phone}`}
+      onClick={handleClick}
+      title={
+        disabled && !phoneAvailable
+          ? "No phone number available"
+          : disabled
+            ? "Phone available via Crustdata enrichment"
+            : `Call ${phone}`
+      }
+    >
+      <Phone className="size-3.5" />
+      <span>{label}</span>
+    </a>
   );
 }
