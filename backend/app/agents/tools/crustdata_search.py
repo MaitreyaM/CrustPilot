@@ -34,8 +34,12 @@ def _map_profiles(profiles: list[dict[str, Any]]) -> list[PersonCard]:
             .get("location", {})
             .get("full_location")
         )
+        skills = profile.get("skills", {}).get("professional_network_skills", []) or []
+        languages = profile.get("basic_profile", {}).get("languages", []) or []
+        contact = profile.get("contact", {}) or {}
+        social_profiles = profile.get("social_handles", {}) or {}
         profile_url = (
-            profile.get("social_handles", {})
+            social_profiles
             .get("professional_network_identifier", {})
             .get("profile_url")
         )
@@ -45,10 +49,25 @@ def _map_profiles(profiles: list[dict[str, Any]]) -> list[PersonCard]:
                 crustdata_person_id=profile.get("crustdata_person_id"),
                 name=profile.get("basic_profile", {}).get("name", "Unknown"),
                 headline=profile.get("basic_profile", {}).get("headline"),
+                summary=profile.get("basic_profile", {}).get("summary"),
                 location=location,
                 current_title=current_role.get("title"),
                 current_company=current_role.get("company_name"),
                 profile_url=profile_url,
+                connections=profile.get("professional_network", {}).get("connections"),
+                skills=skills,
+                languages=languages,
+                current_experience=current_roles,
+                past_experience=(
+                    profile.get("experience", {})
+                    .get("employment_details", {})
+                    .get("past", [])
+                    or []
+                ),
+                education=profile.get("education", {}).get("schools", []) or [],
+                contact=contact,
+                social_profiles=social_profiles,
+                raw_profile=profile,
             )
         )
     return results
@@ -103,6 +122,11 @@ async def search_people_crustdata(
     results = _map_profiles(raw_response.get("profiles", []))
 
     response = PeopleSearchResponse(
+        assistant_message=(
+            f"I found {raw_response.get('total_count', 0)} matching people for your request. "
+            "You can review the interpreted filters, inspect each real profile, and save "
+            "promising matches to leads."
+        ),
         search_intent_summary="Crustdata people search executed from normalized prompt intent.",
         interpreted_request=intent,
         applied_filters=applied_filters,

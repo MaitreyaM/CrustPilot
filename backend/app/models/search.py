@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ChatMessage(BaseModel):
@@ -15,6 +15,12 @@ class PeopleSearchRequest(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     limit: int = Field(default=10, ge=1, le=25)
     cursor: str | None = None
+
+    @model_validator(mode="after")
+    def validate_prompt_or_messages(self) -> "PeopleSearchRequest":
+        if self.prompt or self.messages:
+            return self
+        raise ValueError("Either prompt or messages must be provided.")
 
 
 class NormalizedSearchIntent(BaseModel):

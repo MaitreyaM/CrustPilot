@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic import Field
@@ -41,4 +42,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    os.environ.setdefault("OPENAI_API_KEY", settings.openai_api_key)
+    os.environ.setdefault("CRUSTDATA_API_KEY", settings.crustdata_api_key)
+    return settings

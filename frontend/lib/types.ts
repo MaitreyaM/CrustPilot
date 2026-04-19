@@ -1,3 +1,8 @@
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export type AppliedFilter = {
   field: string;
   operator: string;
@@ -22,13 +27,24 @@ export type PersonCard = {
   crustdata_person_id: number | null;
   name: string;
   headline: string | null;
+  summary: string | null;
   location: string | null;
   current_title: string | null;
   current_company: string | null;
   profile_url: string | null;
+  connections: number | null;
+  skills: string[];
+  languages: string[];
+  current_experience: Array<Record<string, unknown>>;
+  past_experience: Array<Record<string, unknown>>;
+  education: Array<Record<string, unknown>>;
+  contact: Record<string, unknown>;
+  social_profiles: Record<string, unknown>;
+  raw_profile: Record<string, unknown>;
 };
 
 export type PeopleSearchResponse = {
+  assistant_message: string | null;
   search_intent_summary: string;
   interpreted_request: NormalizedSearchIntent;
   applied_filters: AppliedFilter[];
@@ -40,7 +56,8 @@ export type PeopleSearchResponse = {
 };
 
 export type PeopleSearchRequest = {
-  prompt: string;
+  prompt?: string | null;
+  messages?: ChatMessage[];
   limit?: number;
   cursor?: string | null;
 };

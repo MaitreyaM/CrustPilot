@@ -8,10 +8,19 @@ from app.models.search import AppliedFilter, NormalizedSearchIntent
 DEFAULT_FIELDS = [
     "basic_profile.name",
     "basic_profile.headline",
+    "basic_profile.summary",
+    "basic_profile.languages",
     "basic_profile.location.full_location",
-    "experience.employment_details.current.title",
-    "experience.employment_details.current.company_name",
+    "experience.employment_details.current",
+    "experience.employment_details.past",
+    "education.schools",
+    "skills.professional_network_skills",
+    "contact.has_business_email",
+    "contact.has_personal_email",
+    "contact.has_phone_number",
     "social_handles.professional_network_identifier.profile_url",
+    "social_handles.twitter_identifier.slug",
+    "social_handles.dev_platform_identifier.profile_url",
     "professional_network.connections",
 ]
 
